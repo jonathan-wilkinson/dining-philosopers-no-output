@@ -24,6 +24,13 @@ func diningProblem(philosopher string, dominantHand, otherHand *sync.Mutex) {
 	defer wg.Done()
 	for i := hunger; i > 0; i-- {
 		dominantHand.Lock()
+		// This log increases the likelihood of the race conditioning
+		// triggering dramatically. The race condition is when every philosopher
+		// picks up their left fork but isn't fast enough to pick up their right.
+		// My understanding is that writing to the console increases the duration
+		// between those two events, thereby increasing the likelihood that
+		// another philopher "steals" their right fork before they pick it up.
+		fmt.Printf("%s picked up the fork to his left\n", philosopher)
 		otherHand.Lock()
 
 		dominantHand.Unlock()
@@ -45,12 +52,22 @@ func main() {
 	// we need to create a mutex for the very first fork (the one to
 	// the left of the first philosopher). We create it as a pointer,
 	// since a sync.Mutex must not be copied after its initial use.
-	forkLeft := &sync.Mutex{}
+	firstFork := &sync.Mutex{}
+	forkLeft := firstFork
 
 	// start the meal
 	for i := 0; i < len(philosophers); i++ {
 		// create a mutex for the current philosopher's right fork, as a pointer
-		forkRight := &sync.Mutex{}
+		var forkRight *sync.Mutex
+		if i == len(philosophers)-1 {
+			// If this is the last philosopher in the slice
+			// his right fork needs to be the left fork of
+			// the first philosopher (as they're at a round table)
+			forkRight = firstFork
+		} else {
+			forkRight = &sync.Mutex{}
+		}
+
 		// fire off this philosopher's goroutine
 		go diningProblem(philosophers[i], forkLeft, forkRight)
 		forkLeft = forkRight
